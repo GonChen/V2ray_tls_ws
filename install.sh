@@ -458,9 +458,18 @@ ssl_install() {
     judge "安装 SSL 证书生成脚本"
 }
 
+resolve_domain_ips() {
+    local target_domain=$1
+    {
+        getent ahosts "${target_domain}" 2>/dev/null | awk '{print $1}'
+        curl -sm8 "https://223.5.5.5/resolve?name=${target_domain}&type=A" | grep -Eo '"data"[[:space:]]*:[[:space:]]*"[^"]+"' | cut -d '"' -f4
+        curl -sm8 "https://223.5.5.5/resolve?name=${target_domain}&type=AAAA" | grep -Eo '"data"[[:space:]]*:[[:space:]]*"[^"]+"' | cut -d '"' -f4
+    } | grep -E '(^([0-9]{1,3}\.){3}[0-9]{1,3}$)|(^([0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f:.]+$)' | sort -u
+}
+
 domain_check() {
     read -rp "请输入你的域名信息:" domain
-    domain_ip=$(curl -sm8 https://ipget.net/?ip="${domain}" -A "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.47 Safari/536.11Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.47 Safari/536.11")
+    domain_ips=$(resolve_domain_ips "${domain}")
     echo -e "${OK} ${GreenBG} 正在获取 公网ip 信息，请耐心等待 ${Font}"
     wgcfv4_status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
     wgcfv6_status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
@@ -475,14 +484,15 @@ domain_check() {
         echo -e nameserver 2a01:4f8:c2c:123f::1 > /etc/resolv.conf
         echo -e "${OK} ${GreenBG} VM 只启用了 IPv6, 自动添加 DNS64 服务器 ${Font}"
     fi
-    echo -e "域名 DNS 解析到的的 IP：${domain_ip}"
+    echo -e "域名 DNS 解析到的 IP："
+    echo -e "${domain_ips:-未获取到解析记录}"
     echo -e "本机IPv4: ${local_ipv4}"
     echo -e "本机IPv6: ${local_ipv6}"
     sleep 2
-    if [[ ${domain_ip} == ${local_ipv4} ]]; then
+    if [[ -n ${local_ipv4} ]] && grep -qxF "${local_ipv4}" <<< "${domain_ips}"; then
         echo -e "${OK} ${GreenBG} 域名 DNS 解析 IP 与 本机 IPv4 匹配 ${Font}"
         sleep 2
-    elif [[ ${domain_ip} == ${local_ipv6} ]]; then
+    elif [[ -n ${local_ipv6} ]] && grep -qxF "${local_ipv6}" <<< "${domain_ips}"; then
         echo -e "${OK} ${GreenBG} 域名 DNS 解析 IP 与 本机 IPv6 匹配 ${Font}"
         sleep 2
     else
