@@ -288,8 +288,8 @@ modify_UUID() {
 }
 
 modify_nginx_port() {
-    sed -i "/ssl http2;$/c \\\tlisten ${port} ssl http2;" ${nginx_conf}
-    sed -i "/listen \[::\].*http2;$/c \\\tlisten [::]:${port} ssl http2;" ${nginx_conf}
+    sed -i "/^[[:space:]]*listen[[:space:]][0-9].*ssl http2;$/c \\\tlisten ${port} ssl http2;" ${nginx_conf}
+    sed -i "/^[[:space:]]*listen[[:space:]]\[::\].*http2;$/c \\\tlisten [::]:${port} ssl http2;" ${nginx_conf}
     sed -i "/\"port\": 123456789/c \"port\": ${port}," "${v2ray_client_config_json}"
     sed -i "50c \ \ port: ${port}" "${v2ray_client_config_yaml}"
     judge "V2ray port 修改"
